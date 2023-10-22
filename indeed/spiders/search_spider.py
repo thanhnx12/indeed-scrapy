@@ -6,16 +6,16 @@ from urllib.parse import urlencode
 class IndeedSearchSpider(scrapy.Spider):
     name = "indeed_search"
     custom_settings = {
-        'FEEDS': { 'data/%(name)s_%(time)s.csv': { 'format': 'csv',}}
+        'FEEDS': { 'data/%(name)s_%(time)s.json': { 'format': 'json',}}
         }
 
     def get_indeed_search_url(self, keyword, location, offset=0):
         parameters = {"q": keyword, "l": location, "filter": 0, "start": offset}
-        return "https://www.indeed.com/jobs?" + urlencode(parameters)
+        return "https://vn.indeed.com/jobs?" + urlencode(parameters)
 
     def start_requests(self):
         keyword_list = ['software engineer']
-        location_list = ['California']
+        location_list = ['Hà Nội']
         for keyword in keyword_list:
             for location in location_list:
                 indeed_jobs_url = self.get_indeed_search_url(keyword, location)
@@ -55,12 +55,13 @@ class IndeedSearchSpider(scrapy.Spider):
             
             ## Paginate Through Jobs Pages
             if offset == 0:
-                meta_data = json_blob["metaData"]["mosaicProviderJobCardsModel"]["tierSummaries"]
-                num_results = sum(category["jobCount"] for category in meta_data)
-                if num_results > 1000:
-                    num_results = 50
-                
-                for offset in range(10, num_results + 10, 10):
+                count_jobs_string = response.xpath('//div[@class = "jobsearch-JobCountAndSortPane-jobCount css-1af0d6o eu4oa1w0"]/span/text()').get()
+                print(f'count job : {count_jobs_string}' )
+
+                number_of_jobs = list(map(int, re.findall(r'\d+', count_jobs_string)))[0]
+                jobs_per_page = 15
+
+                for offset in range(10, (number_of_jobs // jobs_per_page ) * 10 + 10, 10):
                     url = self.get_indeed_search_url(keyword, location, offset)
                     yield scrapy.Request(url=url, callback=self.parse_search_results, meta={'keyword': keyword, 'location': location, 'offset': offset})
 
